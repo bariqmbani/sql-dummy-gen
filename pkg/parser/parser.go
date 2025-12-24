@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/xwb1989/sqlparser"
@@ -40,6 +41,10 @@ func ParseDDL(ddlContent string) ([]TableSchema, error) {
 			continue
 		}
 
+		// Pre-process to handle DATE/DATETIME/BOOLEAN quirks if necessary.
+		// sqlparser sometimes struggles with BOOLEAN synonym.
+		stmtStr = regexp.MustCompile(`(?i)\bBOOLEAN\b`).ReplaceAllString(stmtStr, "TINYINT")
+
 		stmt, err := sqlparser.Parse(stmtStr)
 		if err != nil {
 			fmt.Printf("Warning: skipping statement due to parse error or non-SQL: %v\nSQL: %s\n", err, stmtStr)
@@ -52,6 +57,11 @@ func ParseDDL(ddlContent string) ([]TableSchema, error) {
 		}
 
 		if ddl.Action != sqlparser.CreateStr {
+			continue
+		}
+
+		if ddl.TableSpec == nil {
+			fmt.Printf("Warning: skipping CREATE TABLE statement with no TableSpec: %s\n", stmtStr)
 			continue
 		}
 
